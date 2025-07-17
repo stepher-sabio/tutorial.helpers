@@ -304,3 +304,14 @@ dkane@macbook project-1 %
 ```{r zz, exercise = TRUE}
 
 ```
+
+## Space Test Case 1
+###
+
+### Exercise 1
+
+<!-- SS: It doesn't fix the spacing for the topics. -->
+
+```{r space-test-case-1-1, exercise = TRUE}
+
+```
