@@ -1,17 +1,19 @@
 #' Check Membership in List of Tibbles
 #'
 #' This function filters a list of tibbles based on whether a key variable's value
-#' is among the allowed values. Useful for keeping only specific students or participants.
+#' is among the membership values. It first uses check_key_vars() to ensure the 
+#' key variable exists, then checks membership. Useful for keeping only specific 
+#' students or participants.
 #'
 #' @param tibble_list A named list of tibbles, each containing an "id" column and a data column
-#' @param key_var A character string specifying the key variable to check (must exist in each tibble's "id" column)
+#' @param key_var A character string specifying the key variable to check
 #' @param membership A character vector of allowed values for the key variable
 #' @param verbose Verbosity level for reporting (default: 0)
 #'   - 0: No messages
-#'   - 1: Report removed files and their values
-#'   - 2: Also report files that pass the membership check
+#'   - 1: Report removed files and their values, plus summary
+#'   - 2: Also report files that pass each check
 #'
-#' @return A list of tibbles where the key variable's value is in the membership list
+#' @return A list of tibbles where the key variable exists and its value is in the membership list
 #'
 #' @examples
 #' \dontrun{
@@ -22,44 +24,40 @@
 #'                   data = c("Jane", "jane@external.com", "22"))
 #' 
 #' tibble_list <- list("student1.html" = tibble1, "student2.html" = tibble2)
-#' allowed_emails <- c("john@student.edu", "mary@student.edu", "bob@student.edu")
+#' my_students <- c("john@student.edu", "mary@student.edu", "bob@student.edu")
 #' 
 #' # Keep only students with allowed emails
-#' valid_students <- check_membership(tibble_list, "email", allowed_emails)
+#' valid_students <- check_membership(tibble_list, "email", my_students)
 #' }
 #' @export
 check_membership <- function(tibble_list, key_var, membership, verbose = 0) {
   
+  # First, use check_key_vars to filter tibbles that have the required key variable
+  if (verbose >= 1) {
+    message("Step 1: Checking for required key variable '", key_var, "'...")
+  }
+  
+  # Set verbose level for check_key_vars (reduce verbosity to avoid duplicate messages)
+  check_verbose <- ifelse(verbose >= 2, 1, 0)
+  tibbles_with_key <- check_key_vars(tibble_list, key_var, verbose = check_verbose)
+  
+  if (length(tibbles_with_key) == 0) {
+    if (verbose >= 1) {
+      message("No tibbles contain the required key variable '", key_var, "'")
+    }
+    return(list())
+  }
+  
+  if (verbose >= 1) {
+    message("Step 2: Checking membership for key variable '", key_var, "'...")
+  }
+  
   # Initialize list to store valid tibbles
   valid_tibbles <- list()
   
-  # Get names of tibbles (use indices if no names provided)
-  if (is.null(names(tibble_list))) {
-    tibble_names <- paste0("tibble_", seq_along(tibble_list))
-  } else {
-    tibble_names <- names(tibble_list)
-  }
-  
-  # Check each tibble
-  for (i in seq_along(tibble_list)) {
-    tibble_data <- tibble_list[[i]]
-    file_name <- tibble_names[i]
-    
-    # Check if tibble has an 'id' column
-    if (!"id" %in% colnames(tibble_data)) {
-      if (verbose >= 1) {
-        message("Removing '", file_name, "': no 'id' column")
-      }
-      next
-    }
-    
-    # Check if tibble has the key variable
-    if (!key_var %in% tibble_data$id) {
-      if (verbose >= 1) {
-        message("Removing '", file_name, "': missing key variable '", key_var, "'")
-      }
-      next
-    }
+  # Check membership for each tibble that passed the key variable check
+  for (file_name in names(tibbles_with_key)) {
+    tibble_data <- tibbles_with_key[[file_name]]
     
     # Get the value of the key variable
     key_var_row <- which(tibble_data$id == key_var)
@@ -90,14 +88,16 @@ check_membership <- function(tibble_list, key_var, membership, verbose = 0) {
   # Report summary if verbose
   if (verbose >= 1) {
     n_original <- length(tibble_list)
-    n_valid <- length(valid_tibbles)
-    n_removed <- n_original - n_valid
+    n_with_key <- length(tibbles_with_key)
+    n_final <- length(valid_tibbles)
+    n_removed_key <- n_original - n_with_key
+    n_removed_membership <- n_with_key - n_final
     
-    if (n_removed > 0) {
-      message("Membership check summary: ", n_removed, " tibble(s) removed, ", n_valid, " tibble(s) retained")
-    } else {
-      message("Membership check summary: All ", n_original, " tibble(s) retained")
-    }
+    message("Final summary:")
+    message("- Started with: ", n_original, " tibble(s)")
+    message("- Removed ", n_removed_key, " tibble(s) for missing key variable '", key_var, "'")
+    message("- Removed ", n_removed_membership, " tibble(s) for membership check")
+    message("- Final result: ", n_final, " tibble(s) retained")
   }
   
   return(valid_tibbles)
